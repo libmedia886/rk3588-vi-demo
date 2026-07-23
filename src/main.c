@@ -24,15 +24,52 @@ static int align_up(int value, int align) {
 
 static int fill_vi_attr(const char *device, MEDIA_VI_ATTR *attr, size_t *frame_size) {
     MEDIA_VI_SOURCE_INFO info;
+    int query_ok;
     memset(&info, 0, sizeof(info));
     memset(attr, 0, sizeof(*attr));
 
-    if (MEDIA_VI_QuerySource(device, &info) != 0 || info.width <= 0 || info.height <= 0) {
-        fprintf(stderr, "MEDIA_VI_QuerySource failed, fallback to 3840x2160 NV12\n");
+    query_ok = MEDIA_VI_QuerySource(device, &info) == 0 &&
+               info.width > 0 && info.height > 0;
+    if (!query_ok) {
+        fprintf(stderr,
+                "Could not read a valid V4L2 current format; "
+                "using the known demo fallback 3840x2160 NV12 at 30 fps\n");
         info.width = 3840;
         info.height = 2160;
         info.stride = 3840;
+        info.fps_milli = 30000;
         info.format = MEDIA_FORMAT_NV12;
+    } else {
+        printf("V4L2 current format: device=%s %dx%d stride=%d fourcc=%s media_format=%d\n",
+               device, info.width, info.height, info.stride,
+               info.fourcc_name[0] ? info.fourcc_name : "unknown", info.format);
+
+        if (info.is_hdmi_rx) {
+            if (info.fps_milli > 0) {
+                printf("HDMI RX status: connected=%d timing=%dx%d fps=%.3f "
+                       "audio_present=%d audio_rate=%d\n",
+                       info.connected, info.width, info.height,
+                       info.fps_milli / 1000.0, info.audio_present,
+                       info.audio_sampling_rate);
+            } else {
+                printf("HDMI RX status: connected=%d timing=%dx%d fps=unknown "
+                       "audio_present=%d audio_rate=%d\n",
+                       info.connected, info.width, info.height,
+                       info.audio_present, info.audio_sampling_rate);
+            }
+        } else if (info.fps_milli <= 0) {
+            printf("Camera FPS is not reported by MEDIA_VI_QuerySource; "
+                   "this demo falls back to 30 fps\n");
+        }
+
+        if (info.format != MEDIA_FORMAT_NV12) {
+            fflush(stdout);
+            fprintf(stderr,
+                    "Unsupported V4L2 current format %s (media_format=%d): "
+                    "this demo supports NV12 only\n",
+                    info.fourcc_name[0] ? info.fourcc_name : "unknown", info.format);
+            return -1;
+        }
     }
 
     attr->device = device;
@@ -95,7 +132,7 @@ int main(int argc, char **argv) {
     while (g_running) {
         MEDIA_BUFFER frame = {-1, -1};
         if (MEDIA_VI_GetFrame(VI_DEV, &frame, 1000) == 0) {
-            printf("captured frame pool=%d handle=%d\n", frame.pool_id, frame.handle);
+            printf("captured frame pool=%d index=%d\n", frame.pool_id, frame.index);
             MEDIA_VI_ReleaseFrame(VI_DEV, frame);
         }
     }
@@ -109,4 +146,3 @@ cleanup:
     MEDIA_SYS_Exit();
     return vi_enabled ? 0 : 1;
 }
-
