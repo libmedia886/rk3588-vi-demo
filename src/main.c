@@ -44,20 +44,7 @@ static int fill_vi_attr(const char *device, MEDIA_VI_ATTR *attr, size_t *frame_s
                device, info.width, info.height, info.stride,
                info.fourcc_name[0] ? info.fourcc_name : "unknown", info.format);
 
-        if (info.is_hdmi_rx) {
-            if (info.fps_milli > 0) {
-                printf("HDMI RX status: connected=%d timing=%dx%d fps=%.3f "
-                       "audio_present=%d audio_rate=%d\n",
-                       info.connected, info.width, info.height,
-                       info.fps_milli / 1000.0, info.audio_present,
-                       info.audio_sampling_rate);
-            } else {
-                printf("HDMI RX status: connected=%d timing=%dx%d fps=unknown "
-                       "audio_present=%d audio_rate=%d\n",
-                       info.connected, info.width, info.height,
-                       info.audio_present, info.audio_sampling_rate);
-            }
-        } else if (info.fps_milli <= 0) {
+        if (info.fps_milli <= 0) {
             printf("Camera FPS is not reported by MEDIA_VI_QuerySource; "
                    "this demo falls back to 30 fps\n");
         }
